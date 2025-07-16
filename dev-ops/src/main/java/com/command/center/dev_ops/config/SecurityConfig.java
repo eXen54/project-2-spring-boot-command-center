@@ -2,39 +2,50 @@ package com.command.center.dev_ops.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+    
     @Bean   
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception{
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-        .authorizeHttpRequests((requests)->requests
-            .requestMatchers("/api/health").hasAnyRole("ADMIN","USER")
-            .requestMatchers("/api/error-logs").hasAnyRole("ADMIN","USER")
-            .anyRequest().authenticated()).httpBasic();
+            .csrf(csrf -> csrf.disable()) // Disable CSRF for API endpoints
+            .authorizeHttpRequests(requests -> requests
+                .requestMatchers(HttpMethod.GET, "/api/health").hasAnyRole("ADMIN", "USER")
+                .requestMatchers(HttpMethod.GET, "/api/error-logs").hasAnyRole("ADMIN", "USER")
+                .requestMatchers(HttpMethod.POST, "/api/error-logs").hasRole("ADMIN")
+                .anyRequest().authenticated()
+            )
+            .httpBasic();
         return http.build();
     }
 
     @Bean
-    public UserDetailsService userDetailsService(){
-        var admin = User.withDefaultPasswordEncoder()
+    public UserDetailsService userDetailsService() {
+        PasswordEncoder encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+        
+        var admin = User.builder()
             .username("admin")
-            .password("admin123")
-            .roles("ADMIN")
+            .password(encoder.encode("admin123"))
+            .roles("ADMIN") // Spring will automatically add ROLE_ prefix
             .build();
-        var user = User.withDefaultPasswordEncoder()
+            
+        var user = User.builder()
             .username("user")
-            .password("user123")
-            .roles("USER")
+            .password(encoder.encode("user123"))
+            .roles("USER") // Spring will automatically add ROLE_ prefix
             .build();
 
-        return new InMemoryUserDetailsManager(admin,user);
+        return new InMemoryUserDetailsManager(admin, user);
     }
 }
